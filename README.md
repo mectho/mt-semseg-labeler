@@ -49,16 +49,16 @@ The outcome of the labeling is a new 8-bit unsigned image with the same dimensio
 #### First Steps
 1| Launch the program 
 
-<img width="640" height="360" src="gitImages/ms-semseg 1.png"/>
+<img width="640" height="360" src="https://github.com/mectho/gitImages/blob/main/gitImages/ms-semseg%201.png"/>
 2| Click On File->Open Folder 
 
-<img width="640" height="360" src="gitImages/ms-semseg 2.png"/>
+<img width="640" height="360" src="https://github.com/mectho/gitImages/blob/main/gitImages/ms-semseg%202.png"/>
 3| Open the "data" folder 
 
-<img width="640" height="360" src="gitImages/ms-semseg 3.png"/>
+<img width="640" height="360" src="https://github.com/mectho/gitImages/blob/main/gitImages/ms-semseg%203.png"/>
 4| Click On "Ok" button
 
-<img width="640" height="360" src="gitImages/ms-semseg 4.png"/>
+<img width="640" height="360" src="https://github.com/mectho/gitImages/blob/main/gitImages/ms-semseg%204.png"/>
 
 #### Hotkeys
 

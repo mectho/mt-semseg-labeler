@@ -1,4 +1,4 @@
-# Mt Semseg Labeler
+# MT Semseg Labeler
 
 ## Table of Contents
 
@@ -8,9 +8,8 @@
 
 ## About <a name = "about"></a>
 
-Mt Semseg Labeler is an image(s) labeling/annotation application which allows the user to label his images, It can generate the mask labeling file for semantic segmentation.
+MT Semseg Labeler is an annotation application which can be used to label images for semantic segmentation, It can generate the mask labeling file.
 
-Write about 1-2 paragraphs describing the purpose of your project.
 
 ## Getting Started <a name = "getting_started"></a>
 
@@ -24,10 +23,12 @@ Write about 1-2 paragraphs describing the purpose of your project.
 ### Installing
 
 - [Download the latest release of this program from the release page.](https://github.com/Mectho/mt-semseg-labeler/releases)
-- Open the directory
 - Launch mt_semseg_labeler.py
 
-The classes.json file contains ...
+
+## How to use <a name = "usage"></a>
+
+The images must be placed within a folder along with a json file, named classes.json, where the user must indicate the different classes and the related mask pixel values.
 
 in the example, the content of classes.json is:
 ```json
@@ -42,7 +43,8 @@ in the example, the content of classes.json is:
 "mango":45
 }
 ```
-## How to use <a name = "usage"></a>
+
+The outcome of the labeling is a new 8-bit unsigned image with the same dimensions of the original image, of which the pixel values correspond to the selected  classes (the specific values are defined in the file classes.json).
 
 #### First Steps
 1| Launch the program 

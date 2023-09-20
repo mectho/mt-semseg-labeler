@@ -14,7 +14,7 @@ from PIL import Image, ImageTk, ImageDraw
 
 
 
-mode_to_bpp = {"1":1, "L":8, "P":8, "RGB":24, "RGBA":32, "CMYK":32, "YCbCr":24, "LAB":24, "HSV":24, "I":32, "F":32}
+mode_to_bpp = {"1":1, "L":8, "P":8, "RGB":24, "RGBA":32, "CMYK":32, "YCbCr":24, "LAB":24, "HSV":24, "I":32, "F":32, "I;16":16}
 
 colorPalette = [(244, 0, 95), (36, 224, 152), (25, 132, 250), (255, 101, 157),
                 (249,38,114), (253,151,31), (235, 209, 88), (166,226,46),

@@ -904,8 +904,11 @@ class MainWindow:
         # check if class file exists
         classFile = os.path.join(dataFolder, self.__classFile)
         if not os.path.isfile(classFile):
-            # error message
-            return
+            # check if default file exists
+            classFile = os.path.join(os.getcwd(), self.__classFile)
+            if not os.path.isfile(classFile):
+                # error message
+                return
 
         # get class dictionary
         classes = {}

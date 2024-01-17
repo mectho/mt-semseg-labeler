@@ -364,7 +364,6 @@ class MainWindow:
 
         self.__data = None
         
-        self.__mask = None
         self.__maskId = None
         self.__mask = None
         self.__maskUpdated = False
@@ -373,6 +372,7 @@ class MainWindow:
         self.__imageDisplay = None # self.__image.resize((maxImgW, maxImgH), Image.NONE)
         self.__imageTk = None #ImageTk.PhotoImage(self.__imageDisplay) #(self.__image)
         self.__imageId = None #self.__canvas.create_image(dispX, dispY, image=self.__imageTk, anchor=NW)
+        self.__lastImageName = None
         
         self.__layer = None
         self.__layerId = None
@@ -403,6 +403,7 @@ class MainWindow:
         self.__zoomP1 = [0, 0]
         self.__zoomP2 = [0, 0]
         self.__mousePos = [0, 0]
+        self.__resetZoom = True
 
         # mouse 
         self.__mouseLeftBtnPressed = False
@@ -429,7 +430,6 @@ class MainWindow:
         self.__canvas.bind("<Button>", self.__onButtonClick)
         # self.__canvas.bind("<B1-Motion>", self.__on_dragging)
         self.__canvas.bind("<ButtonRelease>", self.__onButtonRelease)
-        # self.__canvas.bind("<MouseWheel>", self.__on_mouse_wheel)
         self.__canvas.bind("<Enter>", self.__onEnter)
         self.__canvas.bind("<Leave>", self.__onLeave)
 
@@ -697,41 +697,48 @@ class MainWindow:
 
     # history
 
+    def __cleanHistory(self):
+        self.__historyMask.clear()
+        self.__historyLayer.clear()
+        self.__historyIndex = -1
+
     def __updateHistory(self):
 
         if self.__maskUpdated:
 
             self.__maskUpdated = False
 
-            self.__historyMask.append(self.__mask.copy())
+            # se sono andato indietro nella history, cancello la roba successiva all'attuale 
+            while self.__historyIndex < len(self.__historyMask)-1 :
+                self.__historyMask.pop()
+                self.__historyLayer.pop()
+
+            self.__historyMask.append(self.__mask.getdata().copy())
+            self.__historyLayer.append(self.__layer.copy())
+
             if len(self.__historyMask) > self.__historyMaxNum:
                 self.__historyMask = self.__historyMask[-self.__historyMaxNum:]
-
-            self.__historyLayer.append(self.__layer.copy())
-            if len(self.__historyLayer) > self.__historyMaxNum:
                 self.__historyLayer = self.__historyLayer[-self.__historyMaxNum:]
 
-            self.__historyIndex = len(self.__historyMask) - 1
+            self.__historyIndex += 1
 
         return
 
     def __backwardHistory(self):
 
         if self.__historyIndex > 0:
-            self.__historyIndex = self.__historyIndex - 1
-
-        self.__mask = self.__historyMask[self.__historyIndex].copy()
-        self.__layer = self.__historyLayer[self.__historyIndex].copy()
+            self.__historyIndex -= 1
+            self.__mask.putdata( self.__historyMask[self.__historyIndex] )
+            self.__layer = self.__historyLayer[self.__historyIndex].copy()
 
         return
     
     def __forwardHistory(self):
 
-        if self.__historyIndex < len(self.__historyMask) - 1:
-            self.__historyIndex = self.__historyIndex + 1
-
-        self.__mask = self.__historyMask[self.__historyIndex].copy()
-        self.__layer = self.__historyLayer[self.__historyIndex].copy()
+        if self.__historyIndex < len(self.__historyLayer) - 1:
+            self.__historyIndex += 1
+            self.__mask.putdata( self.__historyMask[self.__historyIndex] )
+            self.__layer = self.__historyLayer[self.__historyIndex].copy()
         
         return
 
@@ -828,40 +835,55 @@ class MainWindow:
 
         # dataFile = self.__dataFiles[self.__dataIndex]
         # dataFolder = self.__dataFolder
-        dataFile = os.path.join(self.__dataFolder, self.__dataFiles[self.__dataIndex])
+        imageName = self.__dataFiles[self.__dataIndex]
+        imagePath = os.path.join(self.__dataFolder, imageName)
         maskFileTerm = self.__maskFileTerm
 
-        if os.path.isfile(dataFile):
+        if os.path.isfile(imagePath):
             # read image file
             try:
                 # img = cv2.imread(fileData)
-                img = Image.open(dataFile) #, format="RGB") #.convert("RGBA")
+                img = Image.open(imagePath) #, format="RGB") #.convert("RGBA")
+                # se è un'immagine in float
+                if img.mode == 'F':
+                    # prendo il minimo e il massimo
+                    minDepth = min(img.getdata())
+                    maxDepth = max(img.getdata())
+                    # la normalizzo
+                    normalizedDepthData = [(value - minDepth) / (maxDepth - minDepth) * 255 for value in img.getdata()]
+                    # rimpiazzo il data dell'immagine
+                    img.putdata(normalizedDepthData)
             except: 
                 img = None
 
             if img is not None:
                 # search the mask file
-                # fileName = os.path.splitext(dataFile)[0]
-                # fileExt = os.path.splitext(dataFile)[1]
-                fileName, fileExt = os.path.splitext(dataFile)
-                fileMask = fileName + maskFileTerm + fileExt
-                if os.path.isfile(fileMask):
-                    # read mask image
-                    try: 
-                        # mask = cv2.imread(fileMask, cv2.IMREAD_GRAYSCALE)
-                        mask = Image.open(fileMask) #, format="L")
-                        if mask.mode != "L":
-                            mask = None 
-                        else:
-                            res = True
-                    except:
-                        mask = None
+                imageExt = os.path.splitext(imagePath)[1]
+                imageName = imageName[ : imageName.rfind('_') ]
 
-                if mask is None:
-                    # mask = np.zeros(img.shape, dtype = "uint8")
-                    # mask = np.zeros(img.shape[0:2], np.uint8)
-                    mask = Image.new("L", img.size, 0)
-                    res = True
+                # se il nome dell'immagine è differente dal precedente
+                if imageName != self.__lastImageName:
+                    self.__resetZoom = True
+                else:
+                    self.__resetZoom = False
+                #  sovrascrivo il last
+                self.__lastImageName = imageName
+
+                maskPath = os.path.join(self.__dataFolder, imageName + maskFileTerm + imageExt )
+                # se il file non esiste
+                if not os.path.isfile(maskPath):
+                    newMask = Image.new("L", img.size, 0)
+                    newMask.save(maskPath)
+                # read mask image
+                try: 
+                    # mask = cv2.imread(maskPath, cv2.IMREAD_GRAYSCALE)
+                    mask = Image.open(maskPath) #, format="L")
+                    if mask.mode != "L":
+                        mask = None 
+                    else:
+                        res = True
+                except:
+                    mask = None
 
             else:
                 res, img, mask = False, None, None
@@ -875,8 +897,11 @@ class MainWindow:
         self.__image = self.__data.convert("RGBA")
         #self.__layer = Image.new("RGBA", self.__image.size, (0, 0, 0, 0))
         # reset zoom
-        self.__zoomP1 = [0, 0]
-        self.__zoomP2 = [self.__image.width - 1, self.__image.height - 1]
+        if self.__resetZoom:
+            self.__zoomFactor = 1.0
+            self.__zoomP1 = [0, 0]
+            self.__zoomP2 = [self.__image.width - 1, self.__image.height - 1]
+            self.__resetZoom = False
 
         self.__layer = Image.new("RGBA", self.__image.size, (0, 0, 0, 0))
         for k, v in self.__classes.items():
@@ -968,15 +993,13 @@ class MainWindow:
 
         # init display data
         self.__initDisplayData()
-
+        self.__cleanHistory()
         self.__maskUpdated = True
         self.__updateHistory()
-
         self.__updateImage()
 
         # set info
         self.__infoBar.setClass(self.__classKey)
-
         f = self.__dataFiles[self.__dataIndex]
         i = self.__dataIndex + 1
         t = len(self.__dataFiles)
@@ -990,13 +1013,7 @@ class MainWindow:
 
         if self.__mask == None:
             return
-
-        dataFile = os.path.join(self.__dataFolder, self.__dataFiles[self.__dataIndex])
-        maskFileTerm = self.__maskFileTerm
-        fileName, fileExt = os.path.splitext(dataFile)
-        fileMask = fileName + maskFileTerm + fileExt
-        if os.path.isdir(self.__dataFolder):
-            self.__mask.save(fileMask)
+        self.__mask.save(self.__mask.filename)
 
         return
 
@@ -1124,6 +1141,10 @@ class MainWindow:
             if self.__ctrlPressed == True:
                 self.__updateLayerAndMask("clear", event.x, event.y)
                 self.__drawLayer()
+            else:
+                self.__layerHide = not self.__layerHide
+                self.__updateImage()
+                
 
         # zoom with wheel
         elif event.num == 4 or event.num == 5:
@@ -1137,49 +1158,66 @@ class MainWindow:
 
             iX, iY = self.__canvasToImage(event.x, event.y)
 
-            # respond to Linux or Windows wheel event
-            if event.num == 4: # or event.delta == 120:
-                # scroll down
-                self.__zoomFactor = self.__zoomFactor - self.__zoomStep
-                if self.__zoomFactor < self.__zoomLowerLimit:
-                    self.__zoomFactor = self.__zoomLowerLimit
-            elif event.num == 5: # or event.delta == -120:
-                # scroll up
-                self.__zoomFactor = self.__zoomFactor + self.__zoomStep
-                if self.__zoomFactor > self.__zoomUpperLimit:
-                    self.__zoomFactor = self.__zoomUpperLimit
+            if self.__ctrlPressed == False :
+                # respond to Linux or Windows wheel event
+                if event.num == 4: # or event.delta == 120:
+                    # scroll down
+                    self.__zoomFactor = self.__zoomFactor - self.__zoomStep
+                    if self.__zoomFactor < self.__zoomLowerLimit:
+                        self.__zoomFactor = self.__zoomLowerLimit
+                elif event.num == 5: # or event.delta == -120:
+                    # scroll up
+                    self.__zoomFactor = self.__zoomFactor + self.__zoomStep
+                    if self.__zoomFactor > self.__zoomUpperLimit:
+                        self.__zoomFactor = self.__zoomUpperLimit
 
-            x1, y1 = -1, -1
-            x2, y2 = -1, -1
-            if self.__zoomFactor == 1.0:
-                x1, y1 = 0, 0
-                x2, y2 = imgW-1, imgH-1
+                x1, y1 = -1, -1
+                x2, y2 = -1, -1
+                if self.__zoomFactor == 1.0:
+                    x1, y1 = 0, 0
+                    x2, y2 = imgW-1, imgH-1
+                else:
+                    imgWNew, imgHNew = int(self.__zoomFactor*imgW), int(self.__zoomFactor*imgH)
+
+                    bbox = self.__canvas.bbox(self.__imageId)
+                    cX, cY = bbox[0], bbox[1]
+                    cW, cH = bbox[2] - cX + 1, bbox[3] - cY + 1
+
+                    # P1
+                    x1 = iX - int((event.x - cX)/cW*imgWNew)
+                    if x1 < 0: x1 = 0
+                    y1 = iY - int((event.y - cY)/cH*imgHNew)
+                    if y1 < 0: y1 = 0
+                    # P2
+                    x2 = x1 + imgWNew - 1
+                    if x2 >= imgW:
+                        x2 = imgW - 1
+                        x1 = x2 - imgWNew
+                    y2 = y1 + imgHNew - 1
+                    if y2 >= imgH:
+                        y2 = imgH - 1
+                        y1 = y2 - imgHNew
+
+                self.__zoomP1 = [x1, y1]
+                self.__zoomP2 = [x2, y2]
+                self.__updateImage()
+            # if ctrl pressed
             else:
-                imgWNew, imgHNew = int(self.__zoomFactor*imgW), int(self.__zoomFactor*imgH)
-
-                bbox = self.__canvas.bbox(self.__imageId)
-                cX, cY = bbox[0], bbox[1]
-                cW, cH = bbox[2] - cX + 1, bbox[3] - cY + 1
-
-                # P1
-                x1 = iX - int((event.x - cX)/cW*imgWNew)
-                if x1 < 0: x1 = 0
-                y1 = iY - int((event.y - cY)/cH*imgHNew)
-                if y1 < 0: y1 = 0
-                # P2
-                x2 = x1 + imgWNew - 1
-                if x2 >= imgW:
-                    x2 = imgW - 1
-                    x1 = x2 - imgWNew
-                y2 = y1 + imgHNew - 1
-                if y2 >= imgH:
-                    y2 = imgH - 1
-                    y1 = y2 - imgHNew
-
-            self.__zoomP1 = [x1, y1]
-            self.__zoomP2 = [x2, y2]
-
-            self.__updateImage()
+                # scroll up
+                if event.num == 5:
+                    self.__brushSize = self.__brushSize - self.__brushSizeStep
+                    if self.__brushSize < self.__brushSizeMin:
+                        self.__brushSize = self.__brushSizeMin
+                # scroll down
+                elif event.num == 4:
+                    self.__brushSize = self.__brushSize + self.__brushSizeStep
+                    if self.__brushSize > self.__brushSizeMax:
+                        self.__brushSize = self.__brushSizeMax
+                
+                # get mouse position
+                x = self.__canvas.winfo_pointerx() - self.__canvas.winfo_rootx() # + self.__canvasPad[0]
+                y = self.__canvas.winfo_pointery() - self.__canvas.winfo_rooty() # + self.__canvasPad[1]
+                self.__drawBrush(x, y)
 
         return 
 
@@ -1220,15 +1258,15 @@ class MainWindow:
             y = self.__canvas.winfo_pointery() - self.__canvas.winfo_rooty() # + self.__canvasPad[1]
             self.__drawBrush(x, y)
 
+        # undo ( ctrl + z )
         elif event.keysym == "z" and self.__ctrlPressed == True:
             self.__backwardHistory()
             self.__drawLayer()
-
         elif event.keysym == "Z" and self.__ctrlPressed == True:
             self.__forwardHistory()
             self.__drawLayer()
         
-        # open ColorTable
+        # open ColorTable ( space )
         elif event.keysym == "space" and self.__ctrlPressed == False:
             if len(self.__classesColor) > 0:
                 if self.__colorDialog == None:
@@ -1239,25 +1277,19 @@ class MainWindow:
                     self.__colorDialog = None
         
         # open new image
-        elif event.keysym == "Right" or event.keysym == "Left" and self.__ctrlPressed == False:
+        elif self.__ctrlPressed == False and event.keysym in ["Right", "Left", "d", "a"]:
             if len(self.__dataFiles) > 0:
 
                 # save mask
-                if self.__mask != None:
-                    dataFile = os.path.join(self.__dataFolder, self.__dataFiles[self.__dataIndex])
-                    maskFileTerm = self.__maskFileTerm
-                    fileName, fileExt = os.path.splitext(dataFile)
-                    fileMask = fileName + maskFileTerm + fileExt
-                    if os.path.isdir(self.__dataFolder):
-                        self.__mask.save(fileMask)
+                self.__onFileSave()
 
-                if event.keysym == "Right":
+                if event.keysym in ["Right", "d"]:
                     self.__dataIndex = self.__dataIndex + 1
                     if self.__dataIndex > len(self.__dataFiles)-1:
                         self.__dataIndex = 0
-                elif event.keysym == "Left":
+                elif event.keysym in ["Left", "a"]:
                     self.__dataIndex = self.__dataIndex - 1
-                    if self.__dataIndex > 0:
+                    if self.__dataIndex < 0:
                         self.__dataIndex = len(self.__dataFiles)-1
             
                 # read data
@@ -1265,9 +1297,11 @@ class MainWindow:
                 if res:
                     # init display data
                     self.__initDisplayData()
+                    self.__cleanHistory()
                     self.__maskUpdated = True
                     self.__updateHistory()
                     self.__updateImage()
+
                     # set file info
                     f = self.__dataFiles[self.__dataIndex]
                     i = self.__dataIndex + 1
@@ -1276,7 +1310,7 @@ class MainWindow:
                     b = mode_to_bpp[self.__data.mode]
                     self.__infoBar.setFile(f, i, t, s, b)
 
-        # hide/show layer
+        # hide/show layer ( ctrl + h )
         elif event.keysym == "h" and self.__ctrlPressed == True:
             self.__layerHide = not self.__layerHide
             self.__updateImage()
@@ -1299,7 +1333,7 @@ class MainWindow:
             y = self.__canvas.winfo_pointery() - self.__canvas.winfo_rooty() # + self.__canvasPad[1]
             self.__drawBrush(x, y)
 
-        # change the shape of the brush
+        # change the shape of the brush ( ctrl + . )
         elif event.keysym == "period" and self.__ctrlPressed == True:
             
             if self.__brushShape == "square":

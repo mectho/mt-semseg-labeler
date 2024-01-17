@@ -66,10 +66,12 @@ The outcome of the labeling is a new 8-bit unsigned image with the same dimensio
 | --- | --- |
 | Scroll wheel       | Increase/Decrease zoom                     |
 | Left Click         | Move Over the image                        |
+| Right Click        | Show/Hide the mask                         |
 | Ctrl + Left Click  | Draw on the mask                           |
 | Ctrl + Right Click | Erase the mask                             |
 | Ctrl + "+"/"-"     | Increase/Decrease the drawing area         | 
 | Ctrl + "."         | Change the drawing area shape              |
+| Ctrl + Scroll wheel| Increase/Decrease the brush                |
 
 
 ## License
